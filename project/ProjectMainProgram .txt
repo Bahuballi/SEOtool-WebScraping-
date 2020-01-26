@@ -1,0 +1,72 @@
+import xlsxwriter                               #importing chart class
+import collections    
+import re           			 	#importing regular expression module
+from urllib.request import urlopen		#importing request from urllib class
+from bs4 import BeautifulSoup			#importing BeautifulSoup
+import sqlite3					#importing database Sqlite
+
+workbook = xlsxwriter.Workbook('E:\\Final.xlsx')    #creating excel worksheet
+worksheet = workbook.add_worksheet()		#adding worksheet to excel file
+url=input('enter a url ')			#asking user for a Url
+file=urlopen(url)				#opening Url
+soup=BeautifulSoup(file,"html.parser")		#parsing html file form Url using bs4
+for script in soup(["script","style"]):		
+	script.extract()			#removing all the script and style from html page 
+text=soup.get_text()				#getting html page in text form
+pattern = re.compile(r'[a-zA-Z.]+')		#regular expression to be searched
+matches = pattern.findall(text)			#list of all the matched strings
+newlist = [word for line in matches for word in line.split('.')]	#spliting of strings having '.' between words and storing them in new list
+for r in newlist:
+    if len(r)<3:
+        newlist.remove(r)  			#removing of all the articles or spaces or single letters      
+l=collections.Counter(newlist).most_common()	#using collection module to form sorted listed tuples words with their frequencies
+conn = sqlite3.connect('E:\\Final.db')		#connecting to database
+conn.execute('''CREATE TABLE FINAL
+                (WORD TEXT NOT NULL,
+                FREQUENCY INT NOT NULL);''')	#creating table and adding columns to the excel worksheet
+l1=[]
+l2=[]						#creating empty list for storing words and frequency
+for x in range(30):
+    if l[x][0]=='' or len(l[x][0])<3:
+        pass					#rechecking of articles and spaces
+    else:
+        l1.append(l[x][0])
+        l2.append(l[x][1])			#adding of words and frequencies respectively 
+for y in range(20):
+    conn.execute("INSERT INTO FINAL VALUES(?,?)",(l1[y],l2[y]));	#inserting of values in table from lists
+    
+conn.commit()					#committing of insertion 
+cursor = conn.execute("SELECT WORD,FREQUENCY FROM FINAL")		#adjusting of cursor 
+for row in cursor:
+        print("WORD :",row[0])
+        print("FREQUENCY :",row[1]) 		#printing values of excel worksheet
+word_dictionary={}        
+for x in range(20):
+    word_dictionary={l1[x]:l2[x]}		#adding of word and frequency in dictionary
+bold = workbook.add_format({'bold': 1})		#adding format to the excel file
+headings = ['WORDS', 'FREQUENCY']		#adding heading to excel columns
+worksheet.write_row('A1', headings, bold)	#making heading bold
+worksheet.set_column('A:A',20)	
+worksheet.set_column('B:B',20)			#adding width size of column
+for x in range(1,20):
+    worksheet.write(x,0, l1[x-1])
+    worksheet.write(x,1, l2[x-1])		#writting values in excel worksheet
+chart1 = workbook.add_chart({'type': 'bar'})	#adding chart type
+chart1.add_series({ 
+	'name':	 '= Sheet1 !$B$1', 
+	'categories': '= Sheet1 !$A$2:$A$7', 
+	'values':	 '= Sheet1 !$B$1:$B$21',	#adding series to chart type   
+})
+chart1.add_series({ 
+	'name':	 ['Sheet1', 0, 1], 
+	'categories': ['Sheet1', 1, 0, 21, 0], 
+	'values':	 ['Sheet1', 1, 1, 21, 1],	#adding series to chart type
+})
+chart1.set_size({'x_scale': 1.5,'y_scale': 2})		#adjusting size of chart
+chart1.set_title ({'name': 'Results of data analysis'})		#creating title of chart
+chart1.set_x_axis({'name': 'Word Frequency'}) 		#naming x axis of chart
+chart1.set_y_axis({'name': 'Words'})			#naming y axis if chart
+chart1.set_style(11)					#setting style of chart
+worksheet.insert_chart('E2', chart1)			#inerting chart in table
+
+workbook.close() 					#saving and closing the excel worksheet
